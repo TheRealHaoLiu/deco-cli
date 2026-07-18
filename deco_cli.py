@@ -131,10 +131,12 @@ def cmd_firmware(args):
         nodes = []
         for item in client.devices:
             nodes.append({
+                "nickname": item.get("nickname", ""),
                 "model": item.get("device_model", ""),
                 "hardware": item.get("hardware_ver", ""),
                 "software": item.get("software_ver", ""),
                 "role": item.get("role", ""),
+                "ip": item.get("device_ip", ""),
                 "mac": item.get("mac", ""),
             })
         if args.json:
@@ -142,11 +144,108 @@ def cmd_firmware(args):
         else:
             for n in nodes:
                 role_tag = f" ({n['role']})" if n['role'] else ""
-                print(f"{n['model']}{role_tag}")
+                title = n['nickname'] or n['model']
+                print(f"{title}{role_tag}")
+                print(f"  Model:    {n['model']}")
                 print(f"  Hardware: {n['hardware']}")
                 print(f"  Software: {n['software']}")
+                print(f"  IP:       {n['ip']}")
                 print(f"  MAC:      {n['mac']}")
                 print()
+
+
+# signal_level entries are per-band backhaul quality, 0 (none) - 3 (good).
+_BAND_LABEL = {"band2_4": "2.4G", "band5": "5G", "band5_1": "5G", "band6": "6G"}
+_SIGNAL_LABEL = {0: "none", 1: "weak", 2: "fair", 3: "good"}
+
+
+def _backhaul_summary(node):
+    """Return (kind, bands, weakest_signal) for a slave's uplink."""
+    conn = node.get("connection_type") or []
+    signal = node.get("signal_level") or {}
+    bands = [b for b in conn if b in signal]
+    if not bands:
+        return "wired", [], None
+    signals = [int(signal[b]) for b in bands]
+    return "wireless", bands, min(signals) if signals else None
+
+
+def _build_mesh(nodes):
+    by_id = {n["device_id"]: n for n in nodes if n.get("device_id")}
+    master = next((n for n in nodes if n.get("role") == "master"), None)
+    children = {id(n): [] for n in nodes}
+    roots = []
+    for n in nodes:
+        if n is master:
+            continue
+        parent = by_id.get(n.get("parent_device_id"))
+        if parent is None or parent is n:
+            parent = master
+        (children[id(parent)] if parent else roots).append(n)
+    if master:
+        roots.insert(0, master)
+    return master, children, roots
+
+
+def cmd_mesh(args):
+    with deco_client(args) as client:
+        nodes = client.request("admin/device?form=device_list",
+                               json.dumps({"operation": "read"})).get("device_list", [])
+
+    master, children, roots = _build_mesh(nodes)
+
+    def node_dict(n):
+        kind, bands, weakest = _backhaul_summary(n)
+        return {
+            "nickname": n.get("nickname", ""),
+            "model": n.get("device_model", ""),
+            "role": n.get("role", ""),
+            "ip": n.get("device_ip", ""),
+            "mac": n.get("mac", ""),
+            "online": n.get("inet_status") == "online",
+            "backhaul": None if n.get("role") == "master" else {
+                "kind": kind,
+                "bands": [_BAND_LABEL.get(b, b) for b in bands],
+                "signal": weakest,
+                "signal_label": _SIGNAL_LABEL.get(weakest) if weakest is not None else None,
+                "per_band": {_BAND_LABEL.get(b, b): int(v)
+                             for b, v in (n.get("signal_level") or {}).items()},
+            },
+        }
+
+    if args.json:
+        print(json.dumps([node_dict(n) for n in nodes], indent=2, default=str))
+        return
+
+    print(f"Mesh topology ({len(nodes)} nodes):\n")
+
+    def render(n, prefix, is_last, is_root):
+        title = n.get("nickname") or n.get("device_model", "")
+        model = n.get("device_model", "")
+        role = n.get("role", "")
+        ip = n.get("device_ip", "")
+        offline = "" if n.get("inet_status") == "online" else "  [OFFLINE]"
+        if is_root:
+            connector, child_prefix = "", ""
+            print(f"{title}  {model} ({role})  {ip}  gateway{offline}")
+        else:
+            connector = "└─ " if is_last else "├─ "
+            child_prefix = "   " if is_last else "│  "
+            kind, bands, weakest = _backhaul_summary(n)
+            if kind == "wired":
+                link = "wired backhaul"
+            else:
+                band_str = "/".join(_BAND_LABEL.get(b, b) for b in bands) or "?"
+                lbl = _SIGNAL_LABEL.get(weakest, "?")
+                flag = "  <-- WEAK" if weakest is not None and weakest <= 1 else ""
+                link = f"{kind} {band_str}  signal {lbl} ({weakest}/3){flag}"
+            print(f"{prefix}{connector}{title}  {model} ({role})  {ip}  {link}{offline}")
+        kids = children.get(id(n), [])
+        for i, kid in enumerate(kids):
+            render(kid, prefix + child_prefix, i == len(kids) - 1, False)
+
+    for n in roots:
+        render(n, "", True, n is master)
 
 
 def cmd_clients(args):
@@ -828,6 +927,7 @@ COMMANDS = {
     "status": cmd_status,
     "devices": cmd_devices,
     "firmware": cmd_firmware,
+    "mesh": cmd_mesh,
     "dns": cmd_dns,
     "dhcp": cmd_dhcp,
     "wifi": cmd_wifi,
@@ -865,6 +965,7 @@ def build_parser():
         ("status", "Router status overview"),
         ("devices", "List connected devices"),
         ("firmware", "Firmware/model info per mesh node"),
+        ("mesh", "Mesh topology tree with backhaul signal health"),
         ("dns", "DNS configuration"),
         ("dhcp", "LAN/DHCP config and active leases (read-only)"),
         ("wifi", "WiFi band status"),

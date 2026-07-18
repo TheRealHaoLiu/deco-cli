@@ -59,7 +59,8 @@ open web UI session and vice versa.
 | `deco status` | Router overview: WAN/LAN IP, CPU, memory, client counts |
 | `deco devices` | All connected devices (hostname, IP, MAC, band) |
 | `deco clients <node-mac>` | Devices connected to one specific mesh node |
-| `deco firmware` | Model / firmware / role per mesh node |
+| `deco firmware` | Model / firmware / role / IP per mesh node |
+| `deco mesh` | Topology tree with per-node wireless backhaul signal health |
 | `deco upgrade-check` | Ask TP-Link's cloud whether firmware updates exist |
 | `deco dns` | WAN DNS configuration |
 | `deco dhcp` | LAN subnet, DNS handed out, and active IP↔MAC↔host leases |
