@@ -84,12 +84,14 @@ previous run using a multi-line overlap match, and appends only new lines to
 `~/.deco-logs/deco.log`. If a run comes too late it writes a `### gap` marker
 instead of silently losing history.
 
-```bash
-deco collect                 # run from cron every 5-10 minutes, or:
-```
+Run it on a schedule from any always-on box on your LAN (a Proxmox LXC, a Pi,
+a NAS — it just needs HTTP access to the router). Templates in `deploy/`:
 
-macOS: edit and install `com.deco.collect.plist` (template in this repo) for a
-10-minute launchd cadence. Linux: a cron entry does the same job.
+- **Linux (systemd):** `deploy/deco-collect.service` + `deco-collect.timer` —
+  10-minute timer, password via a root-owned `/etc/deco-cli.env`. Install
+  steps are in the service file's comments.
+- **Linux (cron):** `*/10 * * * * DECO_PASSWORD=... /opt/deco-cli/.venv/bin/deco collect`
+- **macOS (launchd):** `deploy/com.deco.collect.plist`
 
 **Prometheus / Grafana:**
 

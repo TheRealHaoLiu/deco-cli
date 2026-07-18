@@ -1,0 +1,22 @@
+# systemd service: one incremental log pull from the Deco router.
+# Paired with deco-collect.timer; see deploy/README notes in the main README.
+#
+# Install:
+#   1. Adjust the paths below to your clone location.
+#   2. Create /etc/deco-cli.env (chmod 600, root-owned) containing:
+#        DECO_PASSWORD=your-router-password
+#        DECO_HOST=192.168.68.1
+#   3. cp deploy/deco-collect.{service,timer} /etc/systemd/system/
+#      systemctl daemon-reload && systemctl enable --now deco-collect.timer
+
+[Unit]
+Description=Pull new TP-Link Deco log lines
+Wants=network-online.target
+After=network-online.target
+
+[Service]
+Type=oneshot
+EnvironmentFile=/etc/deco-cli.env
+ExecStart=/opt/deco-cli/.venv/bin/deco collect
+# Optional: also refresh Prometheus metrics on the same cadence:
+# ExecStart=/opt/deco-cli/.venv/bin/deco metrics --prom --output /var/lib/node_exporter/textfile/deco.prom

@@ -1,0 +1,13 @@
+# systemd timer: run deco-collect.service every 10 minutes.
+# The Deco log ring buffer holds ~25-60 minutes, so 10 minutes leaves headroom.
+
+[Unit]
+Description=Run deco collect every 10 minutes
+
+[Timer]
+OnBootSec=2min
+OnUnitActiveSec=10min
+RandomizedDelaySec=30
+
+[Install]
+WantedBy=timers.target
