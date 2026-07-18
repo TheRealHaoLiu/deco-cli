@@ -64,7 +64,7 @@ open web UI session and vice versa.
 | `deco upgrade-check` | Ask TP-Link's cloud whether firmware updates exist |
 | `deco dns` | WAN DNS configuration |
 | `deco dhcp` | LAN subnet, DNS handed out, and active IP↔MAC↔host leases |
-| `deco wifi` | WiFi band status; `deco wifi-toggle host-5g off` to switch |
+| `deco wifi` | WiFi band status; `--detail` for SSIDs/channels/mode; `deco wifi-toggle host-5g off` to switch |
 | `deco internet` | WAN health (exit code 1 when offline — script it) |
 | `deco time` | Router clock, timezone, DST |
 | `deco lookup <mac>` | Find a device or mesh node by MAC |

@@ -384,8 +384,69 @@ def cmd_dhcp(args):
               "the Deco app.")
 
 
+_WIFI_BAND_ORDER = ["band2_4", "band5", "band5_1", "band6"]
+
+
+def _wifi_band_labels(band_keys):
+    # Only append a disambiguator when both 5 GHz radios are actually present.
+    has_two_5g = "band5" in band_keys and "band5_1" in band_keys
+    labels = {"band2_4": "2.4 GHz", "band5": "5 GHz", "band6": "6 GHz",
+              "band5_1": "5 GHz #2" if has_two_5g else "5 GHz"}
+    return labels
+
+
+def _wifi_detail(args, client):
+    # SSIDs and channels only - passwords are deliberately not decoded.
+    wlan = client.request("admin/wireless?form=wlan", json.dumps({"operation": "read"}))
+    band_keys = [b for b in _WIFI_BAND_ORDER if b in wlan]
+    labels = _wifi_band_labels(band_keys)
+    bands = []
+    for b in band_keys:
+        host = wlan[b].get("host", {})
+        guest = wlan[b].get("guest", {})
+        backhaul = wlan[b].get("backhaul", {})
+        bands.append({
+            "band": labels.get(b, b),
+            "host_ssid": _decode_b64(host.get("ssid", "")),
+            "host_enabled": bool(host.get("enable")),
+            "hidden": bool(host.get("enable_hide_ssid")),
+            "channel": host.get("channel"),
+            "channel_width": host.get("channel_width"),
+            "mode": host.get("mode"),
+            "guest_ssid": _decode_b64(guest.get("ssid", "")),
+            "guest_enabled": bool(guest.get("enable")),
+            "backhaul_channel": backhaul.get("channel"),
+        })
+    if args.json:
+        print(json.dumps(bands, indent=2))
+        return
+    for b in bands:
+        state = "enabled" if b["host_enabled"] else "disabled"
+        hidden = "  (hidden)" if b["hidden"] else ""
+        print(f"{b['band']}")
+        print(f"  Host SSID:  {b['host_ssid']!r}  [{state}]{hidden}")
+        print(f"  Channel:    {b['channel']}  width {b['channel_width']}  "
+              f"mode {b['mode']}")
+        if b["guest_ssid"]:
+            gstate = "enabled" if b["guest_enabled"] else "disabled"
+            print(f"  Guest SSID: {b['guest_ssid']!r}  [{gstate}]")
+        if b["backhaul_channel"] is not None:
+            print(f"  Backhaul:   channel {b['backhaul_channel']}")
+        print()
+
+
+def _decode_b64(s):
+    try:
+        return b64decode(s).decode()
+    except Exception:
+        return s
+
+
 def cmd_wifi(args):
     with deco_client(args) as client:
+        if getattr(args, "detail", False):
+            _wifi_detail(args, client)
+            return
         status = client.get_status()
         bands = {
             "host_2g": status.wifi_2g_enable,
@@ -968,7 +1029,6 @@ def build_parser():
         ("mesh", "Mesh topology tree with backhaul signal health"),
         ("dns", "DNS configuration"),
         ("dhcp", "LAN/DHCP config and active leases (read-only)"),
-        ("wifi", "WiFi band status"),
         ("internet", "WAN connectivity status (exit 1 if offline)"),
         ("time", "Router date/time and timezone"),
         ("upgrade-check", "Check for firmware updates"),
@@ -1005,6 +1065,12 @@ def build_parser():
     cl = subs.add_parser("clients", help="List clients connected to a specific mesh node")
     cl.add_argument("--json", **json_kw)
     cl.add_argument("node_mac", help="MAC address of the mesh node (use 'deco firmware' to list nodes)")
+
+    wf = subs.add_parser("wifi", help="WiFi band status")
+    wf.add_argument("--json", **json_kw)
+    wf.add_argument("--detail", action="store_true",
+                    help="Show SSIDs, channels, width, and mode per band "
+                         "(passwords are not shown)")
 
     wt = subs.add_parser("wifi-toggle", help="Toggle a WiFi band on/off")
     wt.add_argument("--json", **json_kw)
