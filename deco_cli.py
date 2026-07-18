@@ -226,6 +226,65 @@ def cmd_dns(args):
             print(f"Conn type:     {data['connection_type']}")
 
 
+def _netmask_to_cidr(mask):
+    try:
+        return sum(bin(int(o)).count("1") for o in mask.split("."))
+    except (ValueError, AttributeError):
+        return None
+
+
+def _ip_sort_key(ip):
+    try:
+        return tuple(int(o) for o in ip.split("."))
+    except (ValueError, AttributeError):
+        return (999, 999, 999, 999)
+
+
+def cmd_dhcp(args):
+    with deco_client(args) as client:
+        lan = client.request("admin/network?form=lan_ip", json.dumps(
+            {"operation": "read", "params": {"device_mac": "default"}}))
+        clients = _online_clients(client)
+
+    lan_ip = lan.get("lan_ip", {})
+    router_ip = lan_ip.get("ip", "")
+    mask = lan_ip.get("mask", "")
+    cidr = _netmask_to_cidr(mask)
+    dns = [d for d in lan.get("dns_server_ip", []) if d]
+
+    leases = sorted(
+        ({"hostname": c["hostname"], "ip": c["ip"], "mac": c["mac"],
+          "connection": c["connection"], "wire_type": c["wire_type"]}
+         for c in clients),
+        key=lambda c: _ip_sort_key(c["ip"]),
+    )
+    result = {
+        "router_ip": router_ip,
+        "netmask": mask,
+        "cidr": f"{router_ip}/{cidr}" if cidr is not None else None,
+        "dns_servers": dns,
+        "leases": leases,
+    }
+
+    if args.json:
+        print(json.dumps(result, indent=2))
+    else:
+        print(f"Router IP:    {router_ip}"
+              + (f"/{cidr}" if cidr is not None else ""))
+        print(f"Netmask:      {mask}")
+        print(f"DNS handed out: {', '.join(dns) if dns else '(none)'}")
+        print()
+        print(f"{'IP':16s}  {'MAC':20s}  {'Type':9s}  {'Hostname'}")
+        print("-" * 78)
+        for lease in leases:
+            print(f"{lease['ip']:16s}  {lease['mac']:20s}  "
+                  f"{lease['connection']:9s}  {lease['hostname']}")
+        print(f"\nTotal: {len(leases)} active leases")
+        print("\nNote: the Deco local API does not expose the DHCP pool range or "
+              "flag which\nleases are static reservations - those live only in "
+              "the Deco app.")
+
+
 def cmd_wifi(args):
     with deco_client(args) as client:
         status = client.get_status()
@@ -770,6 +829,7 @@ COMMANDS = {
     "devices": cmd_devices,
     "firmware": cmd_firmware,
     "dns": cmd_dns,
+    "dhcp": cmd_dhcp,
     "wifi": cmd_wifi,
     "wifi-toggle": cmd_wifi_toggle,
     "lookup": cmd_lookup,
@@ -806,6 +866,7 @@ def build_parser():
         ("devices", "List connected devices"),
         ("firmware", "Firmware/model info per mesh node"),
         ("dns", "DNS configuration"),
+        ("dhcp", "LAN/DHCP config and active leases (read-only)"),
         ("wifi", "WiFi band status"),
         ("internet", "WAN connectivity status (exit 1 if offline)"),
         ("time", "Router date/time and timezone"),

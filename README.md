@@ -62,6 +62,7 @@ open web UI session and vice versa.
 | `deco firmware` | Model / firmware / role per mesh node |
 | `deco upgrade-check` | Ask TP-Link's cloud whether firmware updates exist |
 | `deco dns` | WAN DNS configuration |
+| `deco dhcp` | LAN subnet, DNS handed out, and active IP↔MAC↔host leases |
 | `deco wifi` | WiFi band status; `deco wifi-toggle host-5g off` to switch |
 | `deco internet` | WAN health (exit code 1 when offline — script it) |
 | `deco time` | Router clock, timezone, DST |
@@ -145,6 +146,9 @@ Log retrieval, for the curious: `admin/log_export?form=feedback_log` with
   collector on a schedule if you care about history.
 - Parental controls, QoS, and LED schedules are app/cloud-only and not
   reachable through the local API.
+- **DHCP static reservations** cannot be read or set. `deco dhcp` shows the LAN
+  subnet, DNS, and current leases, but the local API exposes no DHCP pool range
+  and no reservation flags — reservations are managed only in the Deco app.
 
 Unofficial project, not affiliated with TP-Link. Poking undocumented APIs is
 at your own risk — everything here sticks to read operations plus the same
