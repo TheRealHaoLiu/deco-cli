@@ -1,0 +1,33 @@
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[project]
+name = "deco-cli"
+version = "0.1.0"
+description = "CLI for monitoring TP-Link Deco mesh routers: logs, metrics, bandwidth, device tracking"
+readme = "README.md"
+license = { file = "LICENSE" }
+authors = [{ name = "Hao Liu", email = "therealhaoliu@gmail.com" }]
+requires-python = ">=3.11"
+keywords = ["tp-link", "deco", "router", "mesh", "monitoring", "homelab"]
+classifiers = [
+    "Environment :: Console",
+    "License :: OSI Approved :: MIT License",
+    "Programming Language :: Python :: 3.11",
+    "Topic :: System :: Networking :: Monitoring",
+]
+dependencies = [
+    "tplinkrouterc6u>=4.0.0",
+]
+
+[project.urls]
+Repository = "https://github.com/TheRealHaoLiu/deco-cli"
+Issues = "https://github.com/TheRealHaoLiu/deco-cli/issues"
+
+[project.scripts]
+deco = "deco_cli:main"
+
+[tool.hatch.build.targets.wheel]
+packages = ["."]
+only-include = ["deco_cli.py"]

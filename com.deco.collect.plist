@@ -1,0 +1,40 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<!--
+  launchd template: runs `deco collect` every 10 minutes, appending new router
+  log lines to ~/.deco-logs/deco.log. The Deco log buffer only holds ~25-60
+  minutes, so a 10 minute cadence leaves comfortable headroom.
+
+  Install:
+    1. Replace /path/to/deco-cli below with your clone's absolute path.
+    2. Set DECO_PASSWORD (and DECO_HOST if not 192.168.68.1).
+       launchd jobs cannot use interactive 1Password auth, so the password
+       must come from the environment; the plist is plaintext on disk, so
+       chmod 600 it, or use a 1Password service account token
+       (OP_SERVICE_ACCOUNT_TOKEN) instead.
+    3. cp com.deco.collect.plist ~/Library/LaunchAgents/
+       launchctl load ~/Library/LaunchAgents/com.deco.collect.plist
+-->
+<plist version="1.0">
+<dict>
+    <key>Label</key>
+    <string>com.deco.collect</string>
+    <key>ProgramArguments</key>
+    <array>
+        <string>/path/to/deco-cli/.venv/bin/python</string>
+        <string>/path/to/deco-cli/deco_cli.py</string>
+        <string>collect</string>
+    </array>
+    <key>EnvironmentVariables</key>
+    <dict>
+        <key>DECO_PASSWORD</key>
+        <string>FILL_ME_IN</string>
+    </dict>
+    <key>StartInterval</key>
+    <integer>600</integer>
+    <key>StandardOutPath</key>
+    <string>/tmp/deco-collect.out</string>
+    <key>StandardErrorPath</key>
+    <string>/tmp/deco-collect.err</string>
+</dict>
+</plist>
